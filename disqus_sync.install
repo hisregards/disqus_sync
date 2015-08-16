@@ -38,7 +38,6 @@ function _disqus_sync_comments_schema() {
         'type' => 'varchar',
         'length' => 64,
         'description' => 'The ID of the parent comment.',
-        'not null' => TRUE,
       ],
       'body' => [
         'type' => 'text',
@@ -49,12 +48,12 @@ function _disqus_sync_comments_schema() {
         'type' => 'varchar',
         'length' => 255,
         'description' => 'The name of the author.',
-        'not null' => TRUE,
       ],
       'author_username' => [
         'type' => 'varchar',
         'length' => 255,
         'description' => 'The Disqus username of the author.',
+        'not null' => TRUE,
       ],
       'author_url' => [
         'type' => 'varchar',
