@@ -1,0 +1,82 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function disqus_sync_schema() {
+  $schema = [];
+  $schema['disqus_sync_comments'] = _disqus_sync_comments_schema();
+
+  return $schema;
+}
+
+/**
+ * Schema for synced comments table.
+ */
+function _disqus_sync_comments_schema() {
+  $schema = [
+    'fields' => [
+      'comment_id' => [
+        'type' => 'varchar',
+        'length' => 64,
+        'description' => 'The Disqus comment ID.',
+        'not null' => TRUE,
+      ],
+      'thread_id' => [
+        'type' => 'varchar',
+        'length' => 64,
+        'description' => 'The comment thread ID.',
+        'not null' => TRUE,
+      ],
+      'forum_id' => [
+        'type' => 'varchar',
+        'length' => 64,
+        'description' => 'The forum ID of the thread.',
+        'not null' => TRUE,
+      ],
+      'parent_comment_id' => [
+        'type' => 'varchar',
+        'length' => 64,
+        'description' => 'The ID of the parent comment.',
+        'not null' => TRUE,
+      ],
+      'body' => [
+        'type' => 'text',
+        'size' => 'big',
+        'description' => 'The text of the comment.',
+      ],
+      'author_name' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The name of the author.',
+        'not null' => TRUE,
+      ],
+      'author_username' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Disqus username of the author.',
+      ],
+      'author_url' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The URL of the author',
+      ],
+      'date' => [
+        'type' => 'int',
+        'size' => 'big',
+        'description' => 'The UNIX timestamp of the comment.',
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => [
+      'comment_id',
+    ],
+    'indexes' => [
+      'thread' => ['thread_id'],
+    ],
+  ];
+
+  return $schema;
+}
+
+

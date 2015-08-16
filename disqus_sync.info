@@ -1,0 +1,11 @@
+name = Disqus Sync
+description = Uses Advanced Queue and the Disqus API to sync comments to a local database table.
+core = 7.x
+php = 5.5
+
+dependencies[] = disqus
+dependencies[] = advancedqueue
+dependencies[] = libraries
+
+configure = admin/config/services/disqus/sync
+

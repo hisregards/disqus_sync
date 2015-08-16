@@ -1,0 +1,94 @@
+<?php
+
+/**
+ * Implements hook_advanced_queue_info().
+ */
+function disqus_sync_advanced_queue_info() {
+  $items = [];
+
+  $items['disqus_sync_comments'] = [
+    'label' => t('Disqus Comments Sync'),
+    'worker callback' => 'disqus_sync_comments_worker',
+    'delete when completed' => FALSE,
+  ];
+
+  return $items;
+}
+
+/**
+ * Implements hook_cron().
+ */
+function disqus_sync_cron() {
+  // Make sure that the ticket incremental worker is queued in some non-failed state.
+  // This relies on the current implementation of AdvancedQueue which isn't that portable...
+  $result = db_query("SELECT COUNT(*) FROM advancedqueue WHERE name = 'disqus_sync_comments' AND status != 2;")->fetchColumn(0);
+  if (!$result) {
+    $last_success = db_query("SELECT * FROM advancedqueue WHERE name = 'disqus_sync_comments' AND status = 1 ORDER BY item_id DESC;")->fetchObject();
+    $start_time = ($last_success ? unserialize($last_success->data)['start_time'] : 0);
+
+    $data = array(
+      'title' => t('Disqus comment sync job'),
+      'start_time' => $start_time,
+    );
+
+    $queue = DrupalQueue::get('disqus_sync_comments');
+    $queue->createItem($data);
+  }
+}
+
+/**
+ * Worker callback for syncing Disqus comments.
+ */
+function disqus_sync_comments_worker($item) {
+  $start_time = db_query("SELECT MAX(timestamp) FROM {disqus_sync_comments};")->fetchColumn(0);
+
+  // Get the last comment date as suggested by the Disqus docs.
+  $api = disqus_api();
+  $forum = variable_get('disqus_domain', FALSE);
+  if (!$forum) {
+    // No forum is defined, so we don't have any posts to get.
+    return FALSE;
+  }
+  $calls = 0;
+  $max_calls = variable_get('disqus_sync_max_calls_per_job', 20);
+
+  $txn = db_transaction();
+  while ($calls <= $max_calls) {
+    $posts = $api->forums->listPosts(['limit' => 100, 'forum' => $forum, 'since' => $start_time, 'order' => 'asc']);
+    foreach ($posts as $post) {
+      $fields = [
+        'comment_id' => $post->id,
+        'thread_id' => $post->thread,
+        'forum_id' => $post->forum,
+        'parent_comment_id' => $post->parent,
+        'body' => $post->message,
+        'author_name' => $post->author->name,
+        'author_username' => $post->author->username,
+        'author_url' => $post->author->profileUrl,
+        'timestamp' => strtotime($post->createdAt),
+      ];
+
+      db_merge('disqus_sync_comments')
+        ->key(['comment_id' => $post->id])
+        ->fields($fields)
+        ->execute();
+    }
+    if (count($posts) < 100) {
+      // We're done.
+      break;
+    }
+    // Next call starts where we left off! If there are more than 50 posts per
+    // second, we're in trouble. @todo Rework this!
+    $start_time = strtotime($post->createdAt);
+    $calls++;
+  }
+  // All done.
+  unset($txn);
+
+  // Re-queue this job for later! Woohoo.
+  $item->created = time() + variable_get('disqus_sync_comments_timer', 60);
+  // We requeue ourselves here with a +10 minute go-time and an updated
+  // Disqus increment time.
+  $queue->requeueItem($item);
+}
+
