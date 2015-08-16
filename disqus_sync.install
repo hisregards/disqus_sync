@@ -61,7 +61,7 @@ function _disqus_sync_comments_schema() {
         'length' => 255,
         'description' => 'The URL of the author',
       ],
-      'date' => [
+      'timestamp' => [
         'type' => 'int',
         'size' => 'big',
         'description' => 'The UNIX timestamp of the comment.',
