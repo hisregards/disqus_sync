@@ -50,11 +50,17 @@ function disqus_sync_comments_worker($item) {
     return FALSE;
   }
   $calls = 0;
-  $max_calls = variable_get('disqus_sync_max_calls_per_job', 20);
+  $max_calls = variable_get('disqus_sync_max_calls_per_job', 1);
 
   $txn = db_transaction();
   while ($calls <= $max_calls) {
-    $posts = $api->forums->listPosts(['limit' => 100, 'forum' => $forum, 'since' => $start_time, 'order' => 'asc']);
+    try {
+      $posts = $api->forums->listPosts(['limit' => 100, 'forum' => $forum, 'since' => $start_time, 'order' => 'asc']);
+    }
+    catch (DisqusAPIError $e) {
+      drush_print("Disqus API error with code" . $e->getCode() . " and message " . $e->getMessage() . ". Re-queueing job.");
+      break;
+    }
     foreach ($posts as $post) {
       $fields = [
         'comment_id' => $post->id,
@@ -85,8 +91,9 @@ function disqus_sync_comments_worker($item) {
   // All done.
   unset($txn);
 
+  $queue = DrupalQueue::get('disqus_sync_comments');
   // Re-queue this job for later! Woohoo.
-  $item->created = time() + variable_get('disqus_sync_comments_timer', 60);
+  $item->created = time() + variable_get('disqus_sync_comments_timer', 300);
   // We requeue ourselves here with a +10 minute go-time and an updated
   // Disqus increment time.
   $queue->requeueItem($item);
